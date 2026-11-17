@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetCut — Network Control System</title>
+    <meta name="description" content="NetCut - Tool untuk kontrol device di jaringan lokal Anda">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #0f1420;
+            --bg-card: #131825;
+            --bg-elevated: #1a2033;
+            --border: #1e2740;
+            --border-hover: #2a3555;
+            --text-primary: #e2e8f0;
+            --text-secondary: #8892a8;
+            --text-muted: #4a5568;
+            --accent: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.3);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.25);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.25);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.25);
+            --cyan: #06b6d4;
+            --cyan-glow: rgba(6, 182, 212, 0.2);
+            --purple: #8b5cf6;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-xs: 6px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== Background Effects ===== */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.07;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .bg-glow.glow-1 { top: -200px; left: -100px; background: var(--accent); }
+        .bg-glow.glow-2 { bottom: -200px; right: -100px; background: var(--purple); }
+        .bg-glow.glow-3 { top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--cyan); opacity: 0.03; }
+
+        /* ===== Canvas ===== */
+        #networkCanvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.4;
+        }
+
+        /* ===== Layout ===== */
+        .app-container {
+            position: relative;
+            z-index: 10;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 20px 40px;
+        }
+
+        /* ===== Header ===== */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .header-title h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title .subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success-glow);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .clock {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* ===== Network Info Cards ===== */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px 18px;
+            transition: all 0.3s ease;
+        }
+
+        .info-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+
+        .info-card .label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .info-card .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .info-card .value.accent { color: var(--accent); }
+        .info-card .value.success { color: var(--success); }
+        .info-card .value.warning { color: var(--warning); }
+        .info-card .value.cyan { color: var(--cyan); }
+
+        /* ===== Controls ===== */
+        .controls-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            letter-spacing: 0.5px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .btn:hover::before { opacity: 1; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #2563eb);
+            border-color: var(--accent);
+            color: white;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 28px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-danger {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+            box-shadow: 0 0 16px var(--danger-glow);
+        }
+
+        .btn-success {
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+
+        .btn-success:hover {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--success);
+            box-shadow: 0 0 16px var(--success-glow);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 11px;
+        }
+
+        .controls-spacer { flex: 1; }
+
+        /* ===== Progress Bar ===== */
+        .progress-container {
+            width: 100%;
+            height: 3px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .progress-container.active { opacity: 1; }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--cyan), var(--accent));
+            background-size: 200% 100%;
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: shimmer 2s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* ===== Device Table ===== */
+        .table-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .table-header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-elevated);
+        }
+
+        .table-header-bar .title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        .table-header-bar .count {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .device-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .device-table thead th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-secondary);
+            position: sticky;
+            top: 0;
+        }
+
+        .device-table tbody tr {
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(30, 39, 64, 0.5);
+        }
+
+        .device-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .device-table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.04);
+        }
+
+        .device-table tbody tr.is-self {
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .device-table tbody tr.is-gateway {
+            background: rgba(245, 158, 11, 0.04);
+        }
+
+        .device-table tbody tr.is-attacked {
+            background: rgba(239, 68, 68, 0.06);
+            animation: attack-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes attack-pulse {
+            0%, 100% { background: rgba(239, 68, 68, 0.06); }
+            50% { background: rgba(239, 68, 68, 0.12); }
+        }
+
+        .device-table td {
+            padding: 12px 16px;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+
+        .td-index {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+            font-size: 12px;
+            width: 40px;
+        }
+
+        .td-ip {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .td-mac {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .td-hostname {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .td-hostname .name {
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .td-hostname .vendor {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* ===== Badges ===== */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .badge-online {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .badge-attacked {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            animation: badge-blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes badge-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .badge-self {
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .badge-gateway {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .badge-online .badge-dot { background: var(--success); }
+        .badge-attacked .badge-dot { background: var(--danger); animation: none; }
+        .badge-self .badge-dot { background: var(--accent); }
+        .badge-gateway .badge-dot { background: var(--warning); }
+
+        /* ===== Action Buttons ===== */
+        .action-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .action-btn {
+            padding: 5px 14px;
+            border-radius: var(--radius-xs);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid;
+            background: transparent;
+            text-transform: uppercase;
+        }
+
+        .action-btn.cut {
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .action-btn.cut:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: var(--danger);
+            box-shadow: 0 0 12px var(--danger-glow);
+            transform: translateY(-1px);
+        }
+
+        .action-btn.restore {
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .action-btn.restore:hover {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--success);
+            box-shadow: 0 0 12px var(--success-glow);
+            transform: translateY(-1px);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* ===== Empty State ===== */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .empty-state .title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .empty-state .desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+
+        /* ===== Activity Log ===== */
+        .log-container {
+            margin-top: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-elevated);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .log-header:hover {
+            background: rgba(26, 32, 51, 0.8);
+        }
+
+        .log-header .title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-header .toggle {
+            font-size: 12px;
+            color: var(--text-muted);
+            transition: transform 0.3s;
+        }
+
+        .log-header .toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .log-body {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px 0;
+            transition: max-height 0.3s ease;
+        }
+
+        .log-body.collapsed {
+            max-height: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .log-body::-webkit-scrollbar { width: 4px; }
+        .log-body::-webkit-scrollbar-track { background: transparent; }
+        .log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        .log-entry {
+            padding: 4px 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 12px;
+            line-height: 1.6;
+        }
+
+        .log-entry .time {
+            color: var(--text-muted);
+            opacity: 0.6;
+            white-space: nowrap;
+        }
+
+        .log-entry.info .msg { color: var(--cyan); }
+        .log-entry.warn .msg { color: var(--danger); }
+        .log-entry.success .msg { color: var(--success); }
+
+        /* ===== Checkbox ===== */
+        .checkbox-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .app-container { padding: 12px 10px 30px; }
+            .header { flex-direction: column; gap: 12px; padding: 16px; }
+            .header-right { width: 100%; justify-content: center; }
+            .info-grid { grid-template-columns: repeat(2, 1fr); }
+            .controls-bar { flex-direction: column; align-items: stretch; }
+            .controls-spacer { display: none; }
+            .device-table { font-size: 11px; }
+            .device-table td, .device-table th { padding: 8px 10px; }
+            .td-mac { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .info-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 18px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: toast-in 0.4s ease;
+            max-width: 360px;
+        }
+
+        .toast.toast-out {
+            animation: toast-out 0.3s ease forwards;
+        }
+
+        .toast.danger { border-color: rgba(239, 68, 68, 0.4); color: var(--danger); }
+        .toast.success { border-color: rgba(16, 185, 129, 0.4); color: var(--success); }
+        .toast.info { border-color: rgba(59, 130, 246, 0.4); color: var(--accent); }
+
+        @keyframes toast-in {
+            from { opacity: 0; transform: translateX(40px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes toast-out {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(40px); }
+        }
+
+        /* ===== Loading Spinner ===== */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ===== Select All Bar ===== */
+        .select-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: rgba(59, 130, 246, 0.06);
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+        }
+
+        .select-bar label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .selected-count {
+            margin-left: auto;
+            color: var(--accent);
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow glow-1"></div>
+<div class="bg-glow glow-2"></div>
+<div class="bg-glow glow-3"></div>
+<canvas id="networkCanvas"></canvas>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="app-container">
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-icon">⚡</div>
+            <div class="header-title">
+                <h1>NETCUT</h1>
+                <div class="subtitle">NETWORK CONTROL SYSTEM</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-pill">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">IDLE</span>
+            </div>
+            <div class="clock" id="clock"></div>
+        </div>
+    </div>
+
+    <!-- Network Info -->
+    <div class="info-grid" id="infoGrid">
+        <div class="info-card">
+            <div class="label">Gateway IP</div>
+            <div class="value accent" id="infoGateway">—</div>
+        </div>
+        <div class="info-card">
+            <div class="label">Your IP</div>
+            <div class="value success" id="infoLocalIP">—</div>
+        </div>
+        <div class="info-card">
+            <div class="label">Subnet</div>
+            <div class="value cyan" id="infoSubnet">—</div>
+        </div>
+        <div class="info-card">
+            <div class="label">Devices Found</div>
+            <div class="value warning" id="infoDevices">0</div>
+        </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-bar">
+        <button class="btn btn-primary" id="scanBtn" onclick="doScan()">
+            <span>🔍</span> SCAN JARINGAN
+        </button>
+        <button class="btn btn-danger" id="cutSelectedBtn" onclick="cutSelected()" style="display:none;">
+            <span>✂️</span> CUT TERPILIH
+        </button>
+        <button class="btn btn-danger" id="cutAllBtn" onclick="cutAll()" style="display:none;">
+            <span>💀</span> CUT SEMUA
+        </button>
+        <div class="controls-spacer"></div>
+        <button class="btn btn-success" id="restoreAllBtn" onclick="restoreAll()" style="display:none;">
+            <span>🔄</span> RESTORE SEMUA
+        </button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- Device Table -->
+    <div class="table-container">
+        <div class="table-header-bar">
+            <span class="title">📡 CONNECTED DEVICES</span>
+            <span class="count" id="deviceCount">0 devices</span>
+        </div>
+        <div class="select-bar" id="selectBar" style="display:none;">
+            <label>
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                Pilih Semua
+            </label>
+            <span class="selected-count" id="selectedCount">0 dipilih</span>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="device-table" id="deviceTable">
+                <thead>
+                    <tr>
+                        <th style="width:30px;"></th>
+                        <th style="width:40px;">#</th>
+                        <th>IP ADDRESS</th>
+                        <th>MAC ADDRESS</th>
+                        <th>DEVICE / HOSTNAME</th>
+                        <th>STATUS</th>
+                        <th style="width:160px;">AKSI</th>
+                    </tr>
+                </thead>
+                <tbody id="deviceBody">
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <div class="icon">📡</div>
+                                <div class="title">Belum ada device</div>
+                                <div class="desc">Klik "SCAN JARINGAN" untuk menemukan semua device yang terhubung</div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="log-container">
+        <div class="log-header" onclick="toggleLog()">
+            <span class="title">
+                <span>📋</span> ACTIVITY LOG
+            </span>
+            <span class="toggle" id="logToggle">▼</span>
+        </div>
+        <div class="log-body" id="logBody">
+            <!-- log entries go here -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ===== State =====
+    let devices = [];
+    const attacked = new Set();
+    const selected = new Set();
+    let isScanning = false;
+    let logCollapsed = false;
+
+    // ===== Clock =====
+    function updateClock() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ===== Toast =====
+    function showToast(msg, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        const icons = { info: 'ℹ️', success: '✅', danger: '⚠️' };
+        toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${msg}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('toast-out');
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
+    }
+
+    // ===== Log =====
+    function addLog(msg, type = '') {
+        const body = document.getElementById('logBody');
+        const now = new Date();
+        const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        entry.innerHTML = `<span class="time">[${time}]</span><span class="msg">${msg}</span>`;
+        body.appendChild(entry);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function toggleLog() {
+        logCollapsed = !logCollapsed;
+        document.getElementById('logBody').classList.toggle('collapsed', logCollapsed);
+        document.getElementById('logToggle').classList.toggle('collapsed', logCollapsed);
+    }
+
+    // ===== Set Status =====
+    function setStatus(text, color) {
+        const dot = document.getElementById('statusDot');
+        const txt = document.getElementById('statusText');
+        txt.textContent = text;
+        dot.style.background = `var(--${color})`;
+        dot.style.boxShadow = `0 0 8px var(--${color}-glow)`;
+    }
+
+    // ===== Load Network Info =====
+    async function loadNetworkInfo() {
+        try {
+            const res = await fetch('/info');
+            const data = await res.json();
+            document.getElementById('infoGateway').textContent = data.gateway;
+            document.getElementById('infoLocalIP').textContent = data.local_ip;
+            document.getElementById('infoSubnet').textContent = data.ip_range;
+        } catch (e) {
+            console.error('Failed to load network info:', e);
+        }
+    }
+
+    // ===== Progress =====
+    function showProgress(show) {
+        const container = document.getElementById('progressContainer');
+        container.classList.toggle('active', show);
+        if (show) {
+            const bar = document.getElementById('progressBar');
+            bar.style.width = '0%';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 8;
+                if (progress >= 90) {
+                    clearInterval(interval);
+                    progress = 90;
+                }
+                bar.style.width = progress + '%';
+            }, 300);
+            container._interval = interval;
+        } else {
+            if (container._interval) clearInterval(container._interval);
+            document.getElementById('progressBar').style.width = '100%';
+            setTimeout(() => {
+                container.classList.remove('active');
+                document.getElementById('progressBar').style.width = '0%';
+            }, 600);
+        }
+    }
+
+    // ===== Scan =====
+    async function doScan() {
+        if (isScanning) return;
+        isScanning = true;
+
+        const btn = document.getElementById('scanBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> SCANNING...';
+        setStatus('SCANNING', 'warning');
+        showProgress(true);
+        addLog('Memulai scan jaringan...', 'info');
+
+        try {
+            const res = await fetch('/scan');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            devices = data;
+            
+            // Update attack status from server
+            devices.forEach(d => {
+                if (d.is_attacked) {
+                    attacked.add(d.ip);
+                }
+            });
+
+            document.getElementById('infoDevices').textContent = devices.length;
+            setStatus('READY', 'success');
+            addLog(`Scan selesai. Ditemukan ${devices.length} device.`, 'success');
+            showToast(`Ditemukan ${devices.length} device di jaringan`, 'success');
+            renderTable();
+            showButtons();
+        } catch (e) {
+            addLog(`Scan gagal: ${e.message}`, 'warn');
+            showToast(`Scan gagal: ${e.message}`, 'danger');
+            setStatus('ERROR', 'danger');
+        } finally {
+            showProgress(false);
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔍</span> SCAN JARINGAN';
+            isScanning = false;
+        }
+    }
+
+    // ===== Show/Hide Buttons =====
+    function showButtons() {
+        document.getElementById('cutSelectedBtn').style.display = devices.length > 1 ? '' : 'none';
+        document.getElementById('cutAllBtn').style.display = devices.length > 1 ? '' : 'none';
+        document.getElementById('restoreAllBtn').style.display = attacked.size > 0 ? '' : 'none';
+        document.getElementById('selectBar').style.display = devices.length > 1 ? '' : 'none';
+    }
+
+    // ===== Render Table =====
+    function renderTable() {
+        const tbody = document.getElementById('deviceBody');
+        tbody.innerHTML = '';
+
+        if (devices.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <div class="icon">📡</div>
+                        <div class="title">Belum ada device</div>
+                        <div class="desc">Klik "SCAN JARINGAN" untuk menemukan semua device yang terhubung</div>
+                    </div>
+                </td></tr>`;
+            return;
+        }
+
+        devices.forEach((d, i) => {
+            const isAtk = attacked.has(d.ip);
+            const isSelf = d.is_self;
+            const isGw = d.is_gateway;
+            const isChecked = selected.has(d.ip);
+            const canTarget = !isSelf && !isGw;
+
+            let rowClass = '';
+            if (isSelf) rowClass = 'is-self';
+            else if (isGw) rowClass = 'is-gateway';
+            else if (isAtk) rowClass = 'is-attacked';
+
+            let badge = '';
+            if (isSelf) {
+                badge = '<span class="badge badge-self"><span class="badge-dot"></span>ANDA</span>';
+            } else if (isGw) {
+                badge = '<span class="badge badge-gateway"><span class="badge-dot"></span>GATEWAY</span>';
+            } else if (isAtk) {
+                badge = '<span class="badge badge-attacked"><span class="badge-dot"></span>TERPUTUS</span>';
+            } else {
+                badge = '<span class="badge badge-online"><span class="badge-dot"></span>ONLINE</span>';
+            }
+
+            let actions = '';
+            if (canTarget) {
+                if (isAtk) {
+                    actions = `<button class="action-btn restore" onclick="restoreDevice('${d.ip}')">🔄 RESTORE</button>`;
+                } else {
+                    actions = `<button class="action-btn cut" onclick="cutDevice('${d.ip}')">✂️ CUT</button>`;
+                }
+            } else {
+                actions = '<span style="color:var(--text-muted);font-size:11px;">—</span>';
+            }
+
+            const hostname = d.hostname || 'Unknown Device';
+            const vendor = d.vendor || '';
+
+            const row = document.createElement('tr');
+            row.className = rowClass;
+            row.innerHTML = `
+                <td>
+                    ${canTarget ? `<div class="checkbox-wrapper"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelect('${d.ip}', this.checked)"></div>` : ''}
+                </td>
+                <td class="td-index">${String(i + 1).padStart(2, '0')}</td>
+                <td class="td-ip">${d.ip}</td>
+                <td class="td-mac">${d.mac}</td>
+                <td>
+                    <div class="td-hostname">
+                        <span class="name">${hostname}</span>
+                        ${vendor ? `<span class="vendor">${vendor}</span>` : ''}
+                    </div>
+                </td>
+                <td>${badge}</td>
+                <td><div class="action-btns">${actions}</div></td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        document.getElementById('deviceCount').textContent = `${devices.length} devices`;
+        updateSelectedCount();
+    }
+
+    // ===== Selection =====
+    function toggleSelect(ip, checked) {
+        if (checked) selected.add(ip); else selected.delete(ip);
+        updateSelectedCount();
+    }
+
+    function toggleSelectAll(checkbox) {
+        devices.forEach(d => {
+            if (!d.is_self && !d.is_gateway) {
+                if (checkbox.checked) selected.add(d.ip);
+                else selected.delete(d.ip);
+            }
+        });
+        renderTable();
+        document.getElementById('selectAllCheckbox').checked = checkbox.checked;
+    }
+
+    function updateSelectedCount() {
+        document.getElementById('selectedCount').textContent = `${selected.size} dipilih`;
+    }
+
+    // ===== Attack Single =====
+    async function cutDevice(ip) {
+        addLog(`Memutus koneksi → ${ip}`, 'warn');
+        showToast(`Memutus koneksi ${ip}...`, 'danger');
+
+        try {
+            const res = await fetch('/attack', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip })
+            });
+            const data = await res.json();
+            
+            if (data.error) {
+                showToast(data.error, 'danger');
+                addLog(`Error: ${data.error}`, 'warn');
+                return;
+            }
+
+            attacked.add(ip);
+            renderTable();
+            showButtons();
+            setStatus('ATTACKING', 'danger');
+            addLog(`Koneksi ${ip} TERPUTUS`, 'warn');
+        } catch (e) {
+            showToast(`Gagal: ${e.message}`, 'danger');
+        }
+    }
+
+    // ===== Restore Single =====
+    async function restoreDevice(ip) {
+        addLog(`Mengembalikan koneksi ${ip}...`, 'info');
+        showToast(`Mengembalikan koneksi ${ip}...`, 'info');
+
+        try {
+            const res = await fetch('/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip })
+            });
+            const data = await res.json();
+            
+            attacked.delete(ip);
+            renderTable();
+            showButtons();
+            
+            if (attacked.size === 0) setStatus('READY', 'success');
+            addLog(`Koneksi ${ip} DIPULIHKAN`, 'success');
+            showToast(`Koneksi ${ip} dipulihkan`, 'success');
+        } catch (e) {
+            showToast(`Gagal: ${e.message}`, 'danger');
+        }
+    }
+
+    // ===== Cut Selected =====
+    async function cutSelected() {
+        if (selected.size === 0) {
+            showToast('Pilih device dulu dengan checkbox!', 'info');
+            return;
+        }
+
+        const targets = [...selected].filter(ip => !attacked.has(ip));
+        if (targets.length === 0) {
+            showToast('Semua device terpilih sudah di-cut', 'info');
+            return;
+        }
+
+        addLog(`Memutus ${targets.length} device terpilih...`, 'warn');
+
+        try {
+            const res = await fetch('/attack_all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targets })
+            });
+            const data = await res.json();
+            
+            targets.forEach(ip => attacked.add(ip));
+            renderTable();
+            showButtons();
+            setStatus('ATTACKING', 'danger');
+            showToast(`${targets.length} device terputus!`, 'danger');
+            addLog(`${targets.length} device berhasil diputus`, 'warn');
+        } catch (e) {
+            showToast(`Gagal: ${e.message}`, 'danger');
+        }
+    }
+
+    // ===== Cut All =====
+    async function cutAll() {
+        const targets = devices
+            .filter(d => !d.is_self && !d.is_gateway && !attacked.has(d.ip))
+            .map(d => d.ip);
+        
+        if (targets.length === 0) {
+            showToast('Semua device sudah di-cut', 'info');
+            return;
+        }
+
+        addLog(`Memutus SEMUA device (${targets.length})...`, 'warn');
+
+        try {
+            const res = await fetch('/attack_all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targets })
+            });
+            const data = await res.json();
+            
+            targets.forEach(ip => attacked.add(ip));
+            renderTable();
+            showButtons();
+            setStatus('ATTACKING', 'danger');
+            showToast(`SEMUA ${targets.length} device terputus!`, 'danger');
+        } catch (e) {
+            showToast(`Gagal: ${e.message}`, 'danger');
+        }
+    }
+
+    // ===== Restore All =====
+    async function restoreAll() {
+        addLog('Mengembalikan SEMUA koneksi...', 'info');
+
+        try {
+            const res = await fetch('/stop_all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            
+            attacked.clear();
+            renderTable();
+            showButtons();
+            setStatus('READY', 'success');
+            showToast('Semua koneksi dipulihkan!', 'success');
+            addLog('Semua koneksi DIPULIHKAN', 'success');
+        } catch (e) {
+            showToast(`Gagal: ${e.message}`, 'danger');
+        }
+    }
+
+    // ===== Network Canvas Animation =====
+    (function initCanvas() {
+        const canvas = document.getElementById('networkCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        const nodes = [];
+        const nodeCount = 30;
+        for (let i = 0; i < nodeCount; i++) {
+            nodes.push({
+                x: Math.random(),
+                y: Math.random(),
+                vx: (Math.random() - 0.5) * 0.0004,
+                vy: (Math.random() - 0.5) * 0.0004,
+                size: Math.random() * 1.5 + 0.5
+            });
+        }
+
+        function draw() {
+            const w = canvas.width, h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw connections
+            for (let a = 0; a < nodes.length; a++) {
+                for (let b = a + 1; b < nodes.length; b++) {
+                    const dx = (nodes[a].x - nodes[b].x) * w;
+                    const dy = (nodes[a].y - nodes[b].y) * h;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const maxDist = 200;
+                    if (dist < maxDist) {
+                        const alpha = (1 - dist / maxDist) * 0.3;
+                        ctx.strokeStyle = `rgba(59, 130, 246, ${alpha})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(nodes[a].x * w, nodes[a].y * h);
+                        ctx.lineTo(nodes[b].x * w, nodes[b].y * h);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // Draw nodes
+            nodes.forEach(n => {
+                ctx.beginPath();
+                ctx.arc(n.x * w, n.y * h, n.size, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+                ctx.fill();
+            });
+        }
+
+        function tick() {
+            nodes.forEach(n => {
+                n.x += n.vx;
+                n.y += n.vy;
+                if (n.x < 0 || n.x > 1) n.vx *= -1;
+                if (n.y < 0 || n.y > 1) n.vy *= -1;
+            });
+            draw();
+            requestAnimationFrame(tick);
+        }
+
+        tick();
+    })();
+
+    // ===== Init =====
+    loadNetworkInfo();
+    addLog('NetCut dimulai. Siap untuk scan...', 'info');
+</script>
+</body>
+</html>
